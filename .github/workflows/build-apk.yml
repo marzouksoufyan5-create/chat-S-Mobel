@@ -29,7 +29,13 @@ jobs:
           channel: stable
           cache: true
       - name: Generate Android platform files
-        run: flutter create --platforms=android --org com.chats.mobile .
+        run: |
+          flutter create --platforms=android --org com.chats.mobile .
+          mkdir -p android/app
+          cp firebase/google-services.json android/app/google-services.json
+          sed -i '/id "org.jetbrains.kotlin.android"/a\    id "com.google.gms.google-services" version "4.4.2" apply false' android/settings.gradle
+          sed -i '/id "com.android.application"/a\    id "com.google.gms.google-services"' android/app/build.gradle
+          sed -i 's/applicationId "com.chats.mobile.chat_s"/applicationId "com.chats.mobile"/' android/app/build.gradle
       - name: Install dependencies
         run: flutter pub get
       - name: Build release APK
