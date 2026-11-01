@@ -12,9 +12,9 @@ Future<void> main() async {
   runApp(const ChatSApp());
 }
 
-const Color brandGreen = Color(0xFF19C37D);
-const Color pageColor = Color(0xFF0B0F0D);
-const Color panelColor = Color(0xFF151B18);
+const Color brandGreen = Color(0xFFD6B45B); // هوية Chat S الذهبية
+const Color pageColor = Color(0xFF101010);
+const Color panelColor = Color(0xFF1B1B1B);
 
 class ChatSApp extends StatelessWidget {
   const ChatSApp({super.key});
@@ -28,7 +28,7 @@ class ChatSApp extends StatelessWidget {
         brightness: Brightness.dark,
         scaffoldBackgroundColor: pageColor,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: brandGreen,
+          seedColor: const Color(0xFFD6B45B),
           brightness: Brightness.dark,
           surface: panelColor,
         ),
@@ -313,7 +313,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!snap.exists) {
       await ref.set({
         'uid': user.uid,
-        'displayName': user.phoneNumber ?? 'مستخدم Chat S',
+        'displayName': 'مستخدم Chat S',
         'bio': '',
         'photoUrl': '',
         'createdAt': FieldValue.serverTimestamp(),
@@ -503,7 +503,7 @@ class _HomeScreenState extends State<HomeScreen> {
             onTap: () async { await FirebaseAuth.instance.signOut(); },
           ),
           const SizedBox(height: 22),
-          const Center(child: Text('Chat S • إصدار 1.2.0', style: TextStyle(color: Colors.white38))),
+          const Center(child: Text('Chat S • إصدار 1.3.0', style: TextStyle(color: Colors.white38))),
         ]);
       },
     );
