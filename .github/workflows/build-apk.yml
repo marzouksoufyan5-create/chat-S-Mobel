@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Chat S Demo APKs
 
 on:
   workflow_dispatch:
@@ -14,7 +14,24 @@ permissions:
 
 jobs:
   build:
+    name: Build Chat S ${{ matrix.label }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - mode: user
+            app_id: com.chats.mobile.user
+            label: User
+            artifact: chat-s-user-demo-apk
+          - mode: admin
+            app_id: com.chats.mobile.admin
+            label: Admin
+            artifact: chat-s-admin-demo-apk
+    env:
+      APP_MODE: ${{ matrix.mode }}
+      APP_ID: ${{ matrix.app_id }}
+      APP_LABEL: ${{ matrix.label }}
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
@@ -34,6 +51,7 @@ jobs:
           mkdir -p android/app
           cp firebase/google-services.json android/app/google-services.json
           python3 - <<'PY'
+          import os
           from pathlib import Path
 
           settings = next((p for p in (Path("android/settings.gradle.kts"), Path("android/settings.gradle")) if p.exists()), None)
@@ -48,7 +66,7 @@ jobs:
                   raise SystemExit("Could not find Kotlin plugin in Gradle settings")
               plugin = '    id("com.google.gms.google-services") version "4.4.2" apply false' if settings.suffix == ".kts" else '    id "com.google.gms.google-services" version "4.4.2" apply false'
               settings_lines.insert(index + 1, plugin)
-              settings.write_text("\n".join(settings_lines) + "\n")
+              settings.write_text("\\n".join(settings_lines) + "\\n")
 
           app_lines = app.read_text().splitlines()
           if not any("com.google.gms.google-services" in line for line in app_lines):
@@ -62,17 +80,24 @@ jobs:
           if index is None:
               raise SystemExit("Could not find Android applicationId")
           indent = app_lines[index][:len(app_lines[index]) - len(app_lines[index].lstrip())]
-          app_lines[index] = indent + ('applicationId = "com.chats.mobile"' if app.suffix == ".kts" else 'applicationId "com.chats.mobile"')
-          app.write_text("\n".join(app_lines) + "\n")
+          app_lines[index] = indent + (f'applicationId = "{os.environ["APP_ID"]}"' if app.suffix == ".kts" else f'applicationId "{os.environ["APP_ID"]}"')
+          app.write_text("\\n".join(app_lines) + "\\n")
+
+          manifest = Path("android/app/src/main/AndroidManifest.xml")
+          if not manifest.exists():
+              raise SystemExit("Android manifest was not generated")
+          manifest_text = manifest.read_text()
+          manifest_text = manifest_text.replace('android:label="chat_s"', f'android:label="Chat S {os.environ["APP_LABEL"]}"')
+          manifest.write_text(manifest_text)
           PY
       - name: Install dependencies
         run: flutter pub get
-      - name: Build release APK
-        run: flutter build apk --release
+      - name: Build local demo APK
+        run: flutter build apk --release --dart-define=APP_MODE=${{ matrix.mode }}
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: chat-s-android-apk
+          name: ${{ matrix.artifact }}
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 14
