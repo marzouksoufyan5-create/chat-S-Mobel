@@ -136,8 +136,17 @@ class _DemoUserHomeState extends State<DemoUserHome> {
         itemBuilder: (context, index) { final i = filtered[index]; return ListTile(
           leading: CircleAvatar(backgroundColor: const Color(0xFF6B5730), child: Text(names[i].substring(0,1))),
           title: Text(names[i]), subtitle: Text(previews[i], maxLines: 1), trailing: const Text('الآن', style: TextStyle(fontSize: 11)),
-          onTap: () async { await Navigator.push(context, MaterialPageRoute(builder: (_) =>
-            DemoConversationScreen(name: names[i], onLastMessage: (m) => setState(() => previews[i] = m))); },
+          onTap: () {
+            Navigator.push<void>(
+              context,
+              MaterialPageRoute<void>(
+                builder: (_) => DemoConversationScreen(
+                  name: names[i],
+                  onLastMessage: (m) => setState(() => previews[i] = m),
+                ),
+              ),
+            );
+          },
         ); },
       )),
     ]);
