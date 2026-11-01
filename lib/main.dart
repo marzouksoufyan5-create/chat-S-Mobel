@@ -6,11 +6,338 @@ import 'firebase_options.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  const demoMode = String.fromEnvironment('APP_MODE', defaultValue: 'connected');
+  if (demoMode == 'user' || demoMode == 'admin') {
+    runApp(ChatSDemoApp(adminMode: demoMode == 'admin'));
+    return;
+  }
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
   runApp(const ChatSApp());
 }
+
+class ChatSDemoApp extends StatefulWidget {
+  final bool adminMode;
+  const ChatSDemoApp({super.key, required this.adminMode});
+  @override
+  State<ChatSDemoApp> createState() => _ChatSDemoAppState();
+}
+
+class _ChatSDemoAppState extends State<ChatSDemoApp> {
+  bool darkMode = true;
+  static const gold = Color(0xFFD6B45B);
+  @override
+  Widget build(BuildContext context) {
+    final dark = darkMode;
+    return MaterialApp(
+      title: widget.adminMode ? 'Chat S Admin' : 'Chat S User',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        useMaterial3: true,
+        brightness: dark ? Brightness.dark : Brightness.light,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: gold,
+          brightness: dark ? Brightness.dark : Brightness.light,
+          surface: dark ? const Color(0xFF1B1B1B) : const Color(0xFFFFFCF5),
+        ),
+        scaffoldBackgroundColor: dark ? const Color(0xFF101010) : const Color(0xFFF7F4EC),
+        appBarTheme: AppBarTheme(
+          backgroundColor: dark ? const Color(0xFF101010) : const Color(0xFFF7F4EC),
+          foregroundColor: dark ? Colors.white : const Color(0xFF17130D),
+        ),
+        floatingActionButtonTheme: const FloatingActionButtonThemeData(
+          backgroundColor: gold, foregroundColor: Colors.black,
+        ),
+      ),
+      home: Directionality(
+        textDirection: TextDirection.rtl,
+        child: widget.adminMode
+          ? DemoAdminHome(onToggleTheme: () => setState(() => darkMode = !darkMode), darkMode: dark)
+          : DemoUserHome(onToggleTheme: () => setState(() => darkMode = !darkMode), darkMode: dark),
+      ),
+    );
+  }
+}
+
+const _demoNames = ['أحمد محمد', 'العائلة ❤️', 'ليلى', 'فريق العمل', 'يوسف'];
+const _demoMessages = ['وصلت البيت؟', 'مساء الخير جميعاً', 'شكراً لك، إلى اللقاء!', 'تم إرسال الملف', 'هل نتحدث لاحقاً؟'];
+
+class DemoUserHome extends StatefulWidget {
+  final VoidCallback onToggleTheme;
+  final bool darkMode;
+  const DemoUserHome({super.key, required this.onToggleTheme, required this.darkMode});
+  @override
+  State<DemoUserHome> createState() => _DemoUserHomeState();
+}
+
+class _DemoUserHomeState extends State<DemoUserHome> {
+  int tab = 0;
+  final search = TextEditingController();
+  final List<String> names = List<String>.from(_demoNames);
+  final List<String> previews = List<String>.from(_demoMessages);
+  @override
+  void dispose() { search.dispose(); super.dispose(); }
+
+  void notice(String text) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+
+  @override
+  Widget build(BuildContext context) {
+    final pages = [_chats(), _stories(), _calls(), _groups(), _settings()];
+    return Scaffold(
+      appBar: AppBar(
+        title: Row(children: [
+          Container(width: 38, height: 38, decoration: BoxDecoration(color: const Color(0xFFD6B45B), borderRadius: BorderRadius.circular(12)),
+            child: const Icon(Icons.chat_bubble, color: Colors.black)),
+          const SizedBox(width: 10),
+          const Text('Chat S', style: TextStyle(fontWeight: FontWeight.w900)),
+          const SizedBox(width: 8),
+          const Chip(label: Text('نسخة تجريبية', style: TextStyle(fontSize: 10)), visualDensity: VisualDensity.compact),
+        ]),
+        actions: [IconButton(onPressed: widget.onToggleTheme, icon: Icon(widget.darkMode ? Icons.light_mode : Icons.dark_mode)),],
+      ),
+      body: IndexedStack(index: tab, children: pages),
+      floatingActionButton: tab == 0 ? FloatingActionButton(
+        onPressed: () => _newChat(), child: const Icon(Icons.edit_square),
+      ) : null,
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: tab, onDestinationSelected: (v) => setState(() => tab = v),
+        destinations: const [
+          NavigationDestination(icon: Icon(Icons.chat_bubble_outline), label: 'الدردشات'),
+          NavigationDestination(icon: Icon(Icons.circle_outlined), label: 'الحالات'),
+          NavigationDestination(icon: Icon(Icons.call_outlined), label: 'المكالمات'),
+          NavigationDestination(icon: Icon(Icons.groups_outlined), label: 'المجموعات'),
+          NavigationDestination(icon: Icon(Icons.settings_outlined), label: 'الإعدادات'),
+        ],
+      ),
+    );
+  }
+
+  Widget _chats() {
+    final filtered = List.generate(names.length, (i) => i).where((i) =>
+      names[i].contains(search.text) || previews[i].contains(search.text)).toList();
+    return Column(children: [
+      Padding(padding: const EdgeInsets.all(14), child: TextField(
+        controller: search, onChanged: (_) => setState(() {}),
+        decoration: InputDecoration(hintText: 'ابحث عن محادثة أو صديق', prefixIcon: const Icon(Icons.search),
+          filled: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide.none)),
+      )),
+      SizedBox(height: 105, child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 12),
+        children: ['قصتي','سارة','أحمد','ليلى','يوسف'].asMap().entries.map((e) => SizedBox(width: 72, child: Column(children: [
+          Container(padding: const EdgeInsets.all(3), decoration: BoxDecoration(shape: BoxShape.circle,
+            border: Border.all(color: const Color(0xFFD6B45B), width: 2)),
+            child: CircleAvatar(radius: 25, child: Icon(e.key == 0 ? Icons.add : Icons.person))),
+          const SizedBox(height: 5), Text(e.value, style: const TextStyle(fontSize: 11)),
+        ]))).toList(),
+      )),
+      const Padding(padding: EdgeInsets.symmetric(horizontal: 18, vertical: 5), child: Align(alignment: Alignment.centerRight,
+        child: Text('أحدث المحادثات', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)))),
+      Expanded(child: ListView.separated(itemCount: filtered.length, separatorBuilder: (_, __) => const Divider(indent: 80, height: 1),
+        itemBuilder: (context, index) { final i = filtered[index]; return ListTile(
+          leading: CircleAvatar(backgroundColor: const Color(0xFF6B5730), child: Text(names[i].substring(0,1))),
+          title: Text(names[i]), subtitle: Text(previews[i], maxLines: 1), trailing: const Text('الآن', style: TextStyle(fontSize: 11)),
+          onTap: () async { await Navigator.push(context, MaterialPageRoute(builder: (_) =>
+            DemoConversationScreen(name: names[i], onLastMessage: (m) => setState(() => previews[i] = m))); },
+        ); },
+      )),
+    ]);
+  }
+
+  Widget _stories() => _featurePage(Icons.auto_awesome, 'حالات الأصدقاء', [
+    'نشر صورة أو فيديو أو نص',
+    'مشاهدة الحالات لمدة 24 ساعة',
+    'قائمة المشاهدين والتحكم بالخصوصية',
+    'الرد على الحالة والتفاعل معها',
+  ], 'هذه بيانات تجريبية للمعاينة فقط.');
+  Widget _calls() => _featurePage(Icons.video_call, 'مركز المكالمات', [
+    'مكالمات صوتية فردية',
+    'مكالمات فيديو مع تبديل الكاميرا',
+    'مكالمات جماعية',
+    'سجل المكالمات والمكالمات الفائتة',
+    'مشاركة الشاشة وكتم الصوت',
+  ], 'أزرار الاتصال تجريبية ولا تنشئ اتصالاً حقيقياً.');
+  Widget _groups() => _featurePage(Icons.groups, 'المجموعات والقنوات', [
+    'إنشاء مجموعات وإضافة أعضاء',
+    'مشرفون وصلاحيات وإدارة الأعضاء',
+    'قنوات عامة وخاصة',
+    'روابط دعوة وتثبيت الرسائل',
+  ], 'يمكنك استعراض شكل الأقسام قبل ربط الخادم.');
+  Widget _settings() => ListView(padding: const EdgeInsets.all(16), children: [
+    const ListTile(leading: CircleAvatar(child: Icon(Icons.person)), title: Text('مستخدم Chat S'), subtitle: Text('حساب محلي تجريبي')),
+    const Divider(),
+    ListTile(leading: const Icon(Icons.palette), title: const Text('المظهر'), subtitle: const Text('تبديل الوضع الفاتح والداكن'), onTap: widget.onToggleTheme),
+    ...[
+      ['الخصوصية والأمان', Icons.lock], ['الأجهزة المرتبطة', Icons.devices],
+      ['النسخ الاحتياطي', Icons.backup], ['الملصقات والرموز', Icons.emoji_emotions],
+      ['اللغة', Icons.language], ['حول Chat S', Icons.info_outline],
+    ].map((e) => ListTile(leading: Icon(e[1] as IconData), title: Text(e[0] as String), onTap: () => notice('معاينة تجريبية: ${e[0]}'))),
+  ]);
+
+  Widget _featurePage(IconData icon, String title, List<String> features, String note) => ListView(padding: const EdgeInsets.all(18), children: [
+    Container(padding: const EdgeInsets.all(22), decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(22), gradient: const LinearGradient(colors: [Color(0xFF3B2D13), Color(0xFF17130D)])),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Icon(icon, size: 38, color: const Color(0xFFD6B45B)), const SizedBox(height: 12),
+        Text(title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8), const Text('استكشف تجربة Chat S الجديدة', style: TextStyle(color: Colors.white70)),
+      ]),
+    ),
+    const SizedBox(height: 18),
+    ...features.map((f) => Card(child: ListTile(leading: const Icon(Icons.check_circle_outline, color: Color(0xFFD6B45B)), title: Text(f)))),
+    const SizedBox(height: 12), Text(note, style: const TextStyle(color: Colors.grey)),
+  ]);
+
+  void _newChat() {
+    final input = TextEditingController();
+    showDialog(context: context, builder: (ctx) => AlertDialog(
+      title: const Text('محادثة تجريبية جديدة'),
+      content: TextField(controller: input, decoration: const InputDecoration(hintText: 'اسم الصديق')),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+        FilledButton(onPressed: () { final n=input.text.trim(); if(n.isNotEmpty) setState(() { names.insert(0,n); previews.insert(0,'ابدأ المحادثة الآن'); }); Navigator.pop(ctx); },
+          child: const Text('إنشاء')),
+      ],
+    ));
+  }
+}
+
+class DemoConversationScreen extends StatefulWidget {
+  final String name;
+  final ValueChanged<String> onLastMessage;
+  const DemoConversationScreen({super.key, required this.name, required this.onLastMessage});
+  @override
+  State<DemoConversationScreen> createState() => _DemoConversationScreenState();
+}
+
+class _DemoConversationScreenState extends State<DemoConversationScreen> {
+  final input = TextEditingController();
+  final messages = <Map<String, String>>[
+    {'type':'text','text':'مرحباً! أهلاً بك في محادثة Chat S التجريبية.'},
+    {'type':'text','text':'يمكنك تجربة إرسال الرسائل والمقاطع الصوتية هنا.'},
+  ];
+  bool recording = false;
+  int seconds = 0;
+  @override
+  void dispose() { input.dispose(); super.dispose(); }
+
+  void _send() { final t=input.text.trim(); if(t.isEmpty) return; setState(() { messages.add({'type':'text','text':t}); input.clear(); }); widget.onLastMessage(t); }
+  void _record() {
+    setState(() { recording = !recording; seconds = 0; });
+    if (recording) {
+      Future.doWhile(() async { await Future.delayed(const Duration(seconds: 1)); if(!mounted || !recording) return false; setState(() => seconds++); return true; });
+    } else {
+      setState(() => messages.add({'type':'voice','text':'مقطع صوتي تجريبي • ${seconds} ثانية'}));
+      widget.onLastMessage('🎙 مقطع صوتي تجريبي');
+    }
+  }
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: Row(children: [const CircleAvatar(child: Icon(Icons.person)), const SizedBox(width: 10),
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(widget.name, style: const TextStyle(fontSize: 16)), const Text('متصل • وضع تجريبي', style: TextStyle(fontSize: 11, color: Colors.green))])]),
+      actions: [IconButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('المكالمة غير مفعلة في وضع المعاينة'))), icon: const Icon(Icons.call)),
+        IconButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('مكالمة الفيديو غير مفعلة في وضع المعاينة'))), icon: const Icon(Icons.videocam))]),
+    body: Column(children: [
+      Expanded(child: ListView.builder(padding: const EdgeInsets.all(14), itemCount: messages.length, itemBuilder: (_,i) {
+        final m=messages[i]; final voice=m['type']=='voice';
+        return Align(alignment: i.isEven ? Alignment.centerRight : Alignment.centerLeft, child: Container(
+          margin: const EdgeInsets.only(bottom: 9), padding: const EdgeInsets.all(13),
+          decoration: BoxDecoration(color: i.isEven ? const Color(0xFF51401D) : Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(16)),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            if(voice) const Icon(Icons.play_circle_fill, color: Color(0xFFD6B45B)),
+            if(voice) const SizedBox(width: 7),
+            Flexible(child: Text(m['text']!)),
+          ]),
+        ));
+      })),
+      if(recording) Container(width: double.infinity, padding: const EdgeInsets.all(10), color: Colors.red.withValues(alpha:.12),
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(Icons.fiber_manual_record, color: Colors.red, size: 13),
+          const SizedBox(width: 8), Text('جارٍ التسجيل التجريبي 00:${seconds.toString().padLeft(2,'0')}') ])),
+      SafeArea(child: Padding(padding: const EdgeInsets.all(9), child: Row(children: [
+        IconButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('المرفقات ستعمل بعد ربط الخدمات'))), icon: const Icon(Icons.add_circle_outline, color: Color(0xFFD6B45B))),
+        Expanded(child: TextField(controller: input, decoration: InputDecoration(hintText: 'اكتب رسالة...', filled: true,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none)))),
+        IconButton(onPressed: _record, icon: Icon(recording ? Icons.stop_circle : Icons.mic, color: recording ? Colors.red : const Color(0xFFD6B45B), size: 29)),
+        IconButton(onPressed: _send, icon: const Icon(Icons.send, color: Color(0xFFD6B45B))),
+      ]))),
+    ]),
+  );
+}
+
+class DemoAdminHome extends StatefulWidget {
+  final VoidCallback onToggleTheme;
+  final bool darkMode;
+  const DemoAdminHome({super.key, required this.onToggleTheme, required this.darkMode});
+  @override
+  State<DemoAdminHome> createState() => _DemoAdminHomeState();
+}
+
+class _DemoAdminHomeState extends State<DemoAdminHome> {
+  int tab = 0;
+  @override
+  Widget build(BuildContext context) {
+    final pages = [_dashboard(), _users(), _reports(), _adminSettings()];
+    return Scaffold(
+      appBar: AppBar(title: Row(children: [
+        Container(width: 38, height: 38, decoration: BoxDecoration(color: const Color(0xFFD6B45B), borderRadius: BorderRadius.circular(12)),
+          child: const Icon(Icons.admin_panel_settings, color: Colors.black)),
+        const SizedBox(width: 10), const Text('Chat S Admin', style: TextStyle(fontWeight: FontWeight.w900)),
+      ]), actions: [IconButton(onPressed: widget.onToggleTheme, icon: Icon(widget.darkMode ? Icons.light_mode : Icons.dark_mode))]),
+      body: IndexedStack(index: tab, children: pages),
+      bottomNavigationBar: NavigationBar(selectedIndex: tab, onDestinationSelected: (v)=>setState(()=>tab=v),
+        destinations: const [
+          NavigationDestination(icon: Icon(Icons.dashboard_outlined), label: 'الرئيسية'),
+          NavigationDestination(icon: Icon(Icons.people_outline), label: 'المستخدمون'),
+          NavigationDestination(icon: Icon(Icons.flag_outlined), label: 'البلاغات'),
+          NavigationDestination(icon: Icon(Icons.settings_outlined), label: 'الإعدادات'),
+        ]),
+    );
+  }
+
+  Widget _dashboard() => ListView(padding: const EdgeInsets.all(16), children: [
+    Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(22), gradient: const LinearGradient(colors: [Color(0xFF493817), Color(0xFF17130D)])),
+      child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('لوحة تحكم Chat S', style: TextStyle(fontSize: 23, fontWeight: FontWeight.bold)),
+        SizedBox(height: 7), Text('وضع إدارة تجريبي • البيانات محلية وغير متصلة بالخادم', style: TextStyle(color: Colors.white70)),
+      ]),
+    ),
+    const SizedBox(height: 16),
+    GridView.count(shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), crossAxisCount: 2, childAspectRatio: 1.45, crossAxisSpacing: 10, mainAxisSpacing: 10,
+      children: [
+        _stat('المستخدمون', '1,248', Icons.people),
+        _stat('المحادثات', '3,820', Icons.chat),
+        _stat('البلاغات', '12', Icons.flag),
+        _stat('المجموعات', '86', Icons.groups),
+      ]),
+    const SizedBox(height: 18), const Text('أدوات الإدارة', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+    _action('إدارة المستخدمين', Icons.manage_accounts, ()=>setState(()=>tab=1)),
+    _action('مراجعة البلاغات', Icons.report, ()=>setState(()=>tab=2)),
+    _action('إدارة المجموعات والقنوات', Icons.forum, ()=>_notice('معاينة إدارة المجموعات')),
+    _action('رسائل الدعم الفني', Icons.support_agent, ()=>_notice('معاينة صندوق الدعم')),
+    _action('إعدادات التطبيق', Icons.tune, ()=>setState(()=>tab=3)),
+  ]);
+  Widget _stat(String title,String value,IconData icon)=>Card(child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children:[Icon(icon,color:const Color(0xFFD6B45B)), Text(value,style:const TextStyle(fontSize:22,fontWeight:FontWeight.bold)), Text(title,style:const TextStyle(color:Colors.grey))])));
+  Widget _users()=>ListView(padding: const EdgeInsets.all(12), children: [
+    const Padding(padding: EdgeInsets.all(8), child: Text('إدارة المستخدمين التجريبية', style: TextStyle(fontSize: 19,fontWeight: FontWeight.bold))),
+    ...['أحمد محمد','سارة علي','يوسف خالد','ليلى حسن','محمد أمين'].map((n)=>Card(child: ListTile(leading: const CircleAvatar(child: Icon(Icons.person)), title: Text(n), subtitle: const Text('حساب تجريبي • نشط'),
+      trailing: PopupMenuButton<String>(onSelected: (v)=>_notice('$v • ${n} (تجريبي)'), itemBuilder: (_)=>const [PopupMenuItem(value:'عرض الملف',child:Text('عرض الملف')),PopupMenuItem(value:'تعليق الحساب',child:Text('تعليق الحساب')),PopupMenuItem(value:'توثيق الحساب',child:Text('توثيق الحساب'))])))),
+  ]);
+  Widget _reports()=>ListView(padding: const EdgeInsets.all(12), children: [
+    const Padding(padding: EdgeInsets.all(8), child: Text('مراجعة البلاغات', style: TextStyle(fontSize: 19,fontWeight: FontWeight.bold))),
+    ...['محتوى غير مناسب','إزعاج متكرر','حساب مزيف','رسائل مزعجة'].map((n)=>Card(child: ListTile(leading: const Icon(Icons.flag,color:Colors.orange), title: Text(n), subtitle: const Text('بلاغ تجريبي • قيد المراجعة'),
+      trailing: PopupMenuButton<String>(onSelected: (v)=>_notice('$v • تم تسجيله محلياً'), itemBuilder: (_)=>const [PopupMenuItem(value:'قبول البلاغ',child:Text('قبول البلاغ')),PopupMenuItem(value:'رفض البلاغ',child:Text('رفض البلاغ'))])))),
+  ]);
+  Widget _adminSettings()=>ListView(children: [
+    ListTile(leading: const Icon(Icons.palette), title: const Text('المظهر'), subtitle: const Text('تبديل الوضع الفاتح والداكن'), onTap: widget.onToggleTheme),
+    const ListTile(leading: Icon(Icons.security), title: Text('الأمان والصلاحيات'), subtitle: Text('إعدادات معاينة فقط')),
+    const ListTile(leading: Icon(Icons.analytics), title: Text('إحصائيات النظام'), subtitle: Text('بيانات توضيحية وليست مباشرة')),
+    const ListTile(leading: Icon(Icons.backup), title: Text('النسخ الاحتياطي'), subtitle: Text('سيتم ربطه لاحقاً')),
+  ]);
+  Widget _action(String title,IconData icon,VoidCallback onTap)=>Card(child:ListTile(leading:Icon(icon,color:const Color(0xFFD6B45B)),title:Text(title),trailing:const Icon(Icons.chevron_left),onTap:onTap));
+  void _notice(String text)=>ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(text)));
+}
+
 
 const Color brandGreen = Color(0xFFD6B45B); // هوية Chat S الذهبية
 const Color pageColor = Color(0xFF101010);
