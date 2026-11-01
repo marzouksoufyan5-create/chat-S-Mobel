@@ -434,7 +434,12 @@ class _HomeScreenState extends State<HomeScreen> {
     _setting(Icons.lock_outline, 'الخصوصية'),
     _setting(Icons.notifications_none, 'الإشعارات'),
     _setting(Icons.language, 'اللغة'),
-    _setting(Icons.help_outline, 'المساعدة'),\n    ListTile(\n      leading: const Icon(Icons.logout, color: Colors.redAccent),\n      title: const Text('تسجيل الخروج'),\n      onTap: () async { await FirebaseAuth.instance.signOut(); },\n    ),
+    _setting(Icons.help_outline, 'المساعدة'),
+    ListTile(
+      leading: const Icon(Icons.logout, color: Colors.redAccent),
+      title: const Text('تسجيل الخروج'),
+      onTap: () async { await FirebaseAuth.instance.signOut(); },
+    ),
     const SizedBox(height: 22),
     const Center(child: Text('Chat S • إصدار 1.0.0', style: TextStyle(color: Colors.white38))),
   ]);
