@@ -35,46 +35,35 @@ jobs:
           cp firebase/google-services.json android/app/google-services.json
           python3 - <<'PY'
           from pathlib import Path
-          import re
 
           settings = next((p for p in (Path("android/settings.gradle.kts"), Path("android/settings.gradle")) if p.exists()), None)
           app = next((p for p in (Path("android/app/build.gradle.kts"), Path("android/app/build.gradle")) if p.exists()), None)
           if settings is None or app is None:
               raise SystemExit("Android Gradle files were not generated")
 
-          settings_text = settings.read_text()
-          if "com.google.gms.google-services" not in settings_text:
-              if settings.suffix == ".kts":
-                  pattern = r'(?m)^(\\s*id\\(["\\']org\\.jetbrains\\.kotlin\\.android["\\'].*\\)\\s*)$'
-                  replacement = r'\\1\\n    id("com.google.gms.google-services") version "4.4.2" apply false'
-              else:
-                  pattern = r'(?m)^(\\s*id ["\\']org\\.jetbrains\\.kotlin\\.android["\\'].*)$'
-                  replacement = r'\\1\\n    id "com.google.gms.google-services" version "4.4.2" apply false'
-              updated, count = re.subn(pattern, replacement, settings_text, count=1)
-              if count != 1:
-                  raise SystemExit("Could not add Google Services plugin to settings")
-              settings.write_text(updated)
+          settings_lines = settings.read_text().splitlines()
+          if not any("com.google.gms.google-services" in line for line in settings_lines):
+              index = next((i for i, line in enumerate(settings_lines) if "org.jetbrains.kotlin.android" in line), None)
+              if index is None:
+                  raise SystemExit("Could not find Kotlin plugin in Gradle settings")
+              plugin = '    id("com.google.gms.google-services") version "4.4.2" apply false' if settings.suffix == ".kts" else '    id "com.google.gms.google-services" version "4.4.2" apply false'
+              settings_lines.insert(index + 1, plugin)
+              settings.write_text("\n".join(settings_lines) + "\n")
 
-          app_text = app.read_text()
-          if "com.google.gms.google-services" not in app_text:
-              if app.suffix == ".kts":
-                  pattern = r'(?m)^(\\s*id\\(["\\']com\\.android\\.application["\\']\\)\\s*)$'
-                  replacement = r'\\1\\n    id("com.google.gms.google-services")'
-              else:
-                  pattern = r'(?m)^(\\s*id ["\\']com\\.android\\.application["\\']\\s*)$'
-                  replacement = r'\\1\\n    id "com.google.gms.google-services"'
-              updated, count = re.subn(pattern, replacement, app_text, count=1)
-              if count != 1:
-                  raise SystemExit("Could not apply Google Services plugin to app")
-              app_text = updated
+          app_lines = app.read_text().splitlines()
+          if not any("com.google.gms.google-services" in line for line in app_lines):
+              index = next((i for i, line in enumerate(app_lines) if "com.android.application" in line), None)
+              if index is None:
+                  raise SystemExit("Could not find Android application plugin")
+              plugin = '    id("com.google.gms.google-services")' if app.suffix == ".kts" else '    id "com.google.gms.google-services"'
+              app_lines.insert(index + 1, plugin)
 
-          if app.suffix == ".kts":
-              app_text, count = re.subn(r'applicationId\\s*=\\s*["\\'][^"\\']+["\\']', 'applicationId = "com.chats.mobile"', app_text, count=1)
-          else:
-              app_text, count = re.subn(r'applicationId\\s+["\\'][^"\\']+["\\']', 'applicationId "com.chats.mobile"', app_text, count=1)
-          if count != 1:
-              raise SystemExit("Could not set Android applicationId to com.chats.mobile")
-          app.write_text(app_text)
+          index = next((i for i, line in enumerate(app_lines) if "applicationId" in line and not line.strip().startswith("//")), None)
+          if index is None:
+              raise SystemExit("Could not find Android applicationId")
+          indent = app_lines[index][:len(app_lines[index]) - len(app_lines[index].lstrip())]
+          app_lines[index] = indent + ('applicationId = "com.chats.mobile"' if app.suffix == ".kts" else 'applicationId "com.chats.mobile"')
+          app.write_text("\n".join(app_lines) + "\n")
           PY
       - name: Install dependencies
         run: flutter pub get
