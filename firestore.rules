@@ -7,16 +7,23 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if signedIn();
       allow create: if signedIn() && request.auth.uid == userId
-        && !('isVerifiedSupport' in request.resource.data);
-      allow update: if signedIn() && request.auth.uid == userId
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isVerifiedSupport', 'isAdmin', 'uid']);
+        && !('isVerifiedSupport' in request.resource.data)
+        && !('isAdmin' in request.resource.data);
+      allow update: if isAdmin() || (
+        signedIn() && request.auth.uid == userId
+        && !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['isVerifiedSupport', 'isAdmin', 'uid'])
+      );
       allow delete: if false;
     }
 
     match /supportTickets/{userId} {
       allow create: if signedIn() && request.auth.uid == userId;
       allow read: if signedIn() && (request.auth.uid == userId || isAdmin());
-      allow update: if isAdmin();
+      allow update: if isAdmin() || (
+        signedIn() && request.auth.uid == userId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['updatedAt', 'status'])
+      );
       allow delete: if false;
       match /messages/{messageId} {
         allow read: if signedIn() && (request.auth.uid == userId || isAdmin());
