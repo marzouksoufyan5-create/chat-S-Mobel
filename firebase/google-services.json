@@ -1,0 +1,20 @@
+{
+  "project_info": {
+    "project_number": "614610813726",
+    "firebase_url": "https://chat-s-d8536-default-rtdb.europe-west1.firebasedatabase.app",
+    "project_id": "chat-s-d8536",
+    "storage_bucket": "chat-s-d8536.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:614610813726:android:6ae39eb01c796e53007f0f",
+        "android_client_info": { "package_name": "com.chats.mobile" }
+      },
+      "oauth_client": [],
+      "api_key": [{ "current_key": "AIzaSyB0YfXScN-U1k5WcS_5SMk_L_bnehJBfNc" }],
+      "services": { "appinvite_service": { "other_platform_oauth_client": [] } }
+    }
+  ],
+  "configuration_version": "1"
+}
