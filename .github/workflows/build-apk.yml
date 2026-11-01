@@ -33,9 +33,49 @@ jobs:
           flutter create --platforms=android --org com.chats.mobile .
           mkdir -p android/app
           cp firebase/google-services.json android/app/google-services.json
-          sed -i '/id "org.jetbrains.kotlin.android"/a\    id "com.google.gms.google-services" version "4.4.2" apply false' android/settings.gradle
-          sed -i '/id "com.android.application"/a\    id "com.google.gms.google-services"' android/app/build.gradle
-          sed -i 's/applicationId "com.chats.mobile.chat_s"/applicationId "com.chats.mobile"/' android/app/build.gradle
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          settings = next((p for p in (Path("android/settings.gradle.kts"), Path("android/settings.gradle")) if p.exists()), None)
+          app = next((p for p in (Path("android/app/build.gradle.kts"), Path("android/app/build.gradle")) if p.exists()), None)
+          if settings is None or app is None:
+              raise SystemExit("Android Gradle files were not generated")
+
+          settings_text = settings.read_text()
+          if "com.google.gms.google-services" not in settings_text:
+              if settings.suffix == ".kts":
+                  pattern = r'(?m)^(\\s*id\\(["\\']org\\.jetbrains\\.kotlin\\.android["\\'].*\\)\\s*)$'
+                  replacement = r'\\1\\n    id("com.google.gms.google-services") version "4.4.2" apply false'
+              else:
+                  pattern = r'(?m)^(\\s*id ["\\']org\\.jetbrains\\.kotlin\\.android["\\'].*)$'
+                  replacement = r'\\1\\n    id "com.google.gms.google-services" version "4.4.2" apply false'
+              updated, count = re.subn(pattern, replacement, settings_text, count=1)
+              if count != 1:
+                  raise SystemExit("Could not add Google Services plugin to settings")
+              settings.write_text(updated)
+
+          app_text = app.read_text()
+          if "com.google.gms.google-services" not in app_text:
+              if app.suffix == ".kts":
+                  pattern = r'(?m)^(\\s*id\\(["\\']com\\.android\\.application["\\']\\)\\s*)$'
+                  replacement = r'\\1\\n    id("com.google.gms.google-services")'
+              else:
+                  pattern = r'(?m)^(\\s*id ["\\']com\\.android\\.application["\\']\\s*)$'
+                  replacement = r'\\1\\n    id "com.google.gms.google-services"'
+              updated, count = re.subn(pattern, replacement, app_text, count=1)
+              if count != 1:
+                  raise SystemExit("Could not apply Google Services plugin to app")
+              app_text = updated
+
+          if app.suffix == ".kts":
+              app_text, count = re.subn(r'applicationId\\s*=\\s*["\\'][^"\\']+["\\']', 'applicationId = "com.chats.mobile"', app_text, count=1)
+          else:
+              app_text, count = re.subn(r'applicationId\\s+["\\'][^"\\']+["\\']', 'applicationId "com.chats.mobile"', app_text, count=1)
+          if count != 1:
+              raise SystemExit("Could not set Android applicationId to com.chats.mobile")
+          app.write_text(app_text)
+          PY
       - name: Install dependencies
         run: flutter pub get
       - name: Build release APK
