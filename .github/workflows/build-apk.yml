@@ -66,7 +66,7 @@ jobs:
                   raise SystemExit("Could not find Kotlin plugin in Gradle settings")
               plugin = '    id("com.google.gms.google-services") version "4.4.2" apply false' if settings.suffix == ".kts" else '    id "com.google.gms.google-services" version "4.4.2" apply false'
               settings_lines.insert(index + 1, plugin)
-              settings.write_text("\\n".join(settings_lines) + "\\n")
+              settings.write_text("\n".join(settings_lines) + "\n")
 
           app_lines = app.read_text().splitlines()
           if not any("com.google.gms.google-services" in line for line in app_lines):
@@ -81,7 +81,7 @@ jobs:
               raise SystemExit("Could not find Android applicationId")
           indent = app_lines[index][:len(app_lines[index]) - len(app_lines[index].lstrip())]
           app_lines[index] = indent + (f'applicationId = "{os.environ["APP_ID"]}"' if app.suffix == ".kts" else f'applicationId "{os.environ["APP_ID"]}"')
-          app.write_text("\\n".join(app_lines) + "\\n")
+          app.write_text("\n".join(app_lines) + "\n")
 
           manifest = Path("android/app/src/main/AndroidManifest.xml")
           if not manifest.exists():
