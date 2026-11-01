@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
 
 Future<void> main() async {
@@ -35,7 +36,234 @@ class ChatSApp extends StatelessWidget {
       ),
       home: const Directionality(
         textDirection: TextDirection.rtl,
-        child: HomeScreen(),
+        child: AuthGate(),
+      ),
+    );
+  }
+}
+
+class AuthGate extends StatelessWidget {
+  const AuthGate({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+        if (snapshot.hasData) return const HomeScreen();
+        return const PhoneLoginScreen();
+      },
+    );
+  }
+}
+
+class PhoneLoginScreen extends StatefulWidget {
+  const PhoneLoginScreen({super.key});
+
+  @override
+  State<PhoneLoginScreen> createState() => _PhoneLoginScreenState();
+}
+
+class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
+  final _phoneController = TextEditingController();
+  final _codeController = TextEditingController();
+  String? _verificationId;
+  int? _resendToken;
+  bool _codeSent = false;
+  bool _busy = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _phoneController.dispose();
+    _codeController.dispose();
+    super.dispose();
+  }
+
+  String _friendlyError(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'invalid-phone-number':
+        return 'رقم الهاتف غير صحيح. أدخل الرقم مع مفتاح الدولة مثل +33612345678.';
+      case 'too-many-requests':
+        return 'تم إرسال طلبات كثيرة. حاول مرة أخرى لاحقاً.';
+      case 'quota-exceeded':
+        return 'تم تجاوز الحد المسموح لرسائل التحقق حالياً.';
+      case 'invalid-verification-code':
+        return 'رمز التحقق غير صحيح. حاول مرة أخرى.';
+      case 'session-expired':
+        return 'انتهت صلاحية الرمز. اطلب رمزاً جديداً.';
+      case 'network-request-failed':
+        return 'تعذر الاتصال بالإنترنت. تحقق من اتصالك وحاول مجدداً.';
+      default:
+        return e.message ?? 'حدث خطأ أثناء التحقق. حاول مرة أخرى.';
+    }
+  }
+
+  Future<void> _sendCode({bool resend = false}) async {
+    final phone = _phoneController.text.trim().replaceAll(' ', '');
+    if (!phone.startsWith('+') || phone.length < 8) {
+      setState(() => _error = 'أدخل رقم الهاتف كاملاً مع مفتاح الدولة، مثال: +33612345678');
+      return;
+    }
+    setState(() { _busy = true; _error = null; });
+    try {
+      await FirebaseAuth.instance.verifyPhoneNumber(
+        phoneNumber: phone,
+        forceResendingToken: resend ? _resendToken : null,
+        timeout: const Duration(seconds: 60),
+        verificationCompleted: (credential) async {
+          try {
+            await FirebaseAuth.instance.signInWithCredential(credential);
+          } on FirebaseAuthException catch (e) {
+            if (mounted) setState(() => _error = _friendlyError(e));
+          }
+        },
+        verificationFailed: (e) {
+          if (mounted) setState(() { _busy = false; _error = _friendlyError(e); });
+        },
+        codeSent: (verificationId, resendToken) {
+          if (!mounted) return;
+          setState(() {
+            _verificationId = verificationId;
+            _resendToken = resendToken;
+            _codeSent = true;
+            _busy = false;
+          });
+        },
+        codeAutoRetrievalTimeout: (verificationId) {
+          _verificationId = verificationId;
+        },
+      );
+    } on FirebaseAuthException catch (e) {
+      if (mounted) setState(() { _busy = false; _error = _friendlyError(e); });
+    } catch (_) {
+      if (mounted) setState(() { _busy = false; _error = 'تعذر إرسال الرمز. تحقق من الرقم والإنترنت.'; });
+    }
+  }
+
+  Future<void> _verifyCode() async {
+    final code = _codeController.text.trim();
+    if (code.length != 6 || _verificationId == null) {
+      setState(() => _error = 'أدخل رمز التحقق المكوّن من 6 أرقام.');
+      return;
+    }
+    setState(() { _busy = true; _error = null; });
+    try {
+      final credential = PhoneAuthProvider.credential(
+        verificationId: _verificationId!,
+        smsCode: code,
+      );
+      await FirebaseAuth.instance.signInWithCredential(credential);
+    } on FirebaseAuthException catch (e) {
+      if (mounted) setState(() { _busy = false; _error = _friendlyError(e); });
+    } catch (_) {
+      if (mounted) setState(() { _busy = false; _error = 'تعذر التحقق من الرمز. حاول مجدداً.'; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(
+                    width: 72, height: 72,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(color: brandGreen, borderRadius: BorderRadius.circular(22)),
+                    child: const Icon(Icons.chat_bubble_rounded, color: Colors.black, size: 38),
+                  ),
+                  const SizedBox(height: 28),
+                  const Text('مرحباً بك في Chat S',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 25, fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 10),
+                  Text(
+                    _codeSent ? 'أدخل رمز التحقق الذي أرسلناه إلى هاتفك' : 'سجّل الدخول باستخدام رقم هاتفك',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white60, height: 1.6)),
+                  const SizedBox(height: 30),
+                  if (!_codeSent) ...[
+                    TextField(
+                      controller: _phoneController,
+                      keyboardType: TextInputType.phone,
+                      textDirection: TextDirection.ltr,
+                      textAlign: TextAlign.left,
+                      decoration: InputDecoration(
+                        labelText: 'رقم الهاتف مع مفتاح الدولة',
+                        hintText: '+33612345678',
+                        prefixIcon: const Icon(Icons.phone_android),
+                        filled: true, fillColor: panelColor,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                      ),
+                    ),
+                  ] else ...[
+                    TextField(
+                      controller: _codeController,
+                      keyboardType: TextInputType.number,
+                      maxLength: 6,
+                      textDirection: TextDirection.ltr,
+                      textAlign: TextAlign.center,
+                      decoration: InputDecoration(
+                        labelText: 'رمز التحقق SMS',
+                        hintText: '••••••',
+                        counterText: '',
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        filled: true, fillColor: panelColor,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                      ),
+                    ),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton(
+                        onPressed: _busy ? null : () => setState(() { _codeSent = false; _error = null; }),
+                        child: const Text('تغيير رقم الهاتف'),
+                      ),
+                    ),
+                  ],
+                  if (_error != null) ...[
+                    const SizedBox(height: 12),
+                    Text(_error!, textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.redAccent)),
+                  ],
+                  const SizedBox(height: 20),
+                  FilledButton(
+                    onPressed: _busy ? null : (_codeSent ? _verifyCode : _sendCode),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: brandGreen,
+                      foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    child: _busy
+                      ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))
+                      : Text(_codeSent ? 'تأكيد الرمز وتسجيل الدخول' : 'إرسال رمز التحقق',
+                          style: const TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                  if (_codeSent) ...[
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: _busy ? null : () => _sendCode(resend: true),
+                      child: const Text('إعادة إرسال الرمز'),
+                    ),
+                  ],
+                  const SizedBox(height: 18),
+                  const Text('باستخدامك التطبيق، ستتلقى رسالة SMS للتحقق من ملكية رقمك.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white38, fontSize: 12, height: 1.5)),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -206,7 +434,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _setting(Icons.lock_outline, 'الخصوصية'),
     _setting(Icons.notifications_none, 'الإشعارات'),
     _setting(Icons.language, 'اللغة'),
-    _setting(Icons.help_outline, 'المساعدة'),
+    _setting(Icons.help_outline, 'المساعدة'),\n    ListTile(\n      leading: const Icon(Icons.logout, color: Colors.redAccent),\n      title: const Text('تسجيل الخروج'),\n      onTap: () async { await FirebaseAuth.instance.signOut(); },\n    ),
     const SizedBox(height: 22),
     const Center(child: Text('Chat S • إصدار 1.0.0', style: TextStyle(color: Colors.white38))),
   ]);
