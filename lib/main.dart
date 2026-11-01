@@ -324,7 +324,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final titles = ['المحادثات', 'الحالات', 'المكالمات', 'الإعدادات'];
+    final titles = ['المحادثات', 'الحالات', 'المكالمات', 'المجموعات', 'الإعدادات'];
     return Scaffold(
       appBar: AppBar(
         backgroundColor: pageColor,
@@ -347,7 +347,8 @@ class _HomeScreenState extends State<HomeScreen> {
       body: IndexedStack(index: tab, children: [
         _chatsPage(),
         _emptyPage(Icons.circle_outlined, 'حالاتك', 'شارك لحظاتك مع أصدقائك قريباً'),
-        _emptyPage(Icons.call_outlined, 'المكالمات', 'ستظهر مكالماتك هنا'),
+        _callsPage(),
+        _groupsPage(),
         _settingsPage(),
       ]),
       floatingActionButton: tab == 0
@@ -367,6 +368,7 @@ class _HomeScreenState extends State<HomeScreen> {
           NavigationDestination(icon: Icon(Icons.chat_bubble_outline), selectedIcon: Icon(Icons.chat_bubble), label: 'الدردشات'),
           NavigationDestination(icon: Icon(Icons.circle_outlined), label: 'الحالات'),
           NavigationDestination(icon: Icon(Icons.call_outlined), label: 'المكالمات'),
+          NavigationDestination(icon: Icon(Icons.groups_outlined), label: 'المجموعات'),
           NavigationDestination(icon: Icon(Icons.settings_outlined), label: 'الإعدادات'),
         ],
       ),
@@ -392,6 +394,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
+      _storiesStrip(),
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
         child: Row(children: [
@@ -437,6 +440,115 @@ class _HomeScreenState extends State<HomeScreen> {
       )),
     ]);
   }
+
+
+  Widget _storiesStrip() => SizedBox(
+    height: 112,
+    child: ListView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsetsDirectional.fromSTEB(16, 4, 16, 12),
+      children: [
+        _storyItem('قصتي', Icons.add, true),
+        _storyItem('سارة', Icons.face_rounded, false),
+        _storyItem('أحمد', Icons.person, false),
+        _storyItem('ليلى', Icons.face_3, false),
+        _storyItem('يوسف', Icons.person_rounded, false),
+      ],
+    ),
+  );
+
+  Widget _storyItem(String name, IconData icon, bool own) => Padding(
+    padding: const EdgeInsetsDirectional.only(end: 15),
+    child: SizedBox(width: 62, child: Column(children: [
+      Container(
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: own ? Colors.white24 : brandGreen, width: 2),
+        ),
+        child: CircleAvatar(
+          radius: 25,
+          backgroundColor: panelColor,
+          child: Icon(icon, color: brandGreen, size: 25),
+        ),
+      ),
+      const SizedBox(height: 6),
+      Text(name, maxLines: 1, overflow: TextOverflow.ellipsis,
+        style: const TextStyle(fontSize: 11, color: Colors.white70)),
+    ])),
+  );
+
+  Widget _callsPage() => ListView(
+    padding: const EdgeInsets.all(18),
+    children: [
+      Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(colors: [Color(0xFF302514), Color(0xFF17130D)]),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: brandGreen.withValues(alpha: .35)),
+        ),
+        child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Icon(Icons.call, color: brandGreen, size: 30),
+          SizedBox(height: 12),
+          Text('مكالمات Chat S', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          SizedBox(height: 6),
+          Text('مكالمات صوتية ومرئية بجودة عالية — ستُفعّل خدمة الاتصال في مرحلة لاحقة.',
+            style: TextStyle(color: Colors.white70, height: 1.5)),
+        ]),
+      ),
+      const SizedBox(height: 22),
+      const Text('مميزات المكالمات', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+      const SizedBox(height: 10),
+      _featureTile(Icons.call_outlined, 'مكالمة صوتية', 'تواصل صوتي عبر الإنترنت'),
+      _featureTile(Icons.video_call_outlined, 'مكالمة فيديو', 'رؤية الأصدقاء بوضوح'),
+      _featureTile(Icons.groups_outlined, 'مكالمات جماعية', 'اجمع أصدقاءك في مكالمة واحدة'),
+      _featureTile(Icons.screen_share_outlined, 'مشاركة الشاشة', 'شارك ما يظهر على هاتفك'),
+    ],
+  );
+
+  Widget _groupsPage() => ListView(
+    padding: const EdgeInsets.all(18),
+    children: [
+      Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: panelColor,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: brandGreen.withValues(alpha: .25)),
+        ),
+        child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Icon(Icons.groups_rounded, color: brandGreen, size: 34),
+          SizedBox(height: 12),
+          Text('مجتمعاتك في مكان واحد', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
+          SizedBox(height: 6),
+          Text('أنشئ مجموعات للأصدقاء والعائلة والعمل، مع أدوات للمشرفين وإدارة الأعضاء.',
+            style: TextStyle(color: Colors.white60, height: 1.5)),
+        ]),
+      ),
+      const SizedBox(height: 18),
+      _featureTile(Icons.group_add_outlined, 'إنشاء مجموعة', 'ابدأ مجموعة جديدة مع أصدقائك'),
+      _featureTile(Icons.campaign_outlined, 'القنوات', 'تابع القنوات العامة والخاصة'),
+      _featureTile(Icons.admin_panel_settings_outlined, 'إدارة الأعضاء', 'صلاحيات للمشرفين وأدوات تنظيم'),
+      const SizedBox(height: 12),
+      OutlinedButton.icon(
+        onPressed: () => _showNotice('سيتم ربط إنشاء المجموعات بقاعدة البيانات في المرحلة التالية.'),
+        icon: const Icon(Icons.add),
+        label: const Text('إنشاء مجموعة جديدة'),
+      ),
+    ],
+  );
+
+  Widget _featureTile(IconData icon, String title, String subtitle) => ListTile(
+    contentPadding: const EdgeInsets.symmetric(vertical: 3),
+    leading: Container(
+      width: 44, height: 44,
+      decoration: BoxDecoration(color: brandGreen.withValues(alpha: .13), borderRadius: BorderRadius.circular(14)),
+      child: Icon(icon, color: brandGreen),
+    ),
+    title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+    subtitle: Text(subtitle, style: const TextStyle(color: Colors.white54)),
+  );
 
   Widget _emptyPage(IconData icon, String title, String subtitle) => Center(
     child: Column(mainAxisSize: MainAxisSize.min, children: [
