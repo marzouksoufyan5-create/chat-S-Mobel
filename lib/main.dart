@@ -314,7 +314,6 @@ class _HomeScreenState extends State<HomeScreen> {
       await ref.set({
         'uid': user.uid,
         'displayName': user.phoneNumber ?? 'مستخدم Chat S',
-        'phoneNumber': user.phoneNumber ?? '',
         'bio': '',
         'photoUrl': '',
         'createdAt': FieldValue.serverTimestamp(),
@@ -478,6 +477,18 @@ class _HomeScreenState extends State<HomeScreen> {
           _setting(Icons.lock_outline, 'الخصوصية'),
           _setting(Icons.notifications_none, 'الإشعارات'),
           _setting(Icons.language, 'اللغة'),
+          FutureBuilder<IdTokenResult>(
+            future: user.getIdTokenResult(),
+            builder: (context, claimSnapshot) {
+              if (claimSnapshot.data?.claims?['admin'] != true) return const SizedBox.shrink();
+              return ListTile(
+                leading: const Icon(Icons.admin_panel_settings, color: Color(0xFFFFD54F)),
+                title: const Text('صندوق الدعم الفني'),
+                subtitle: const Text('الرد على رسائل المستخدمين'),
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SupportInboxScreen())),
+              );
+            },
+          ),
           ListTile(
             leading: const Icon(Icons.support_agent, color: brandGreen),
             title: const Text('الدعم الفني'),
@@ -620,7 +631,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       'uid': uid,
       'displayName': name.text.trim(),
       'bio': bio.text.trim(),
-      'phoneNumber': FirebaseAuth.instance.currentUser?.phoneNumber ?? '',
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
     if (mounted) setState(() => saving = false);
@@ -656,12 +666,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             child: Icon(Icons.verified, color: Color(0xFFFFD54F), size: 22),
           ),
         ])),
-        if ((data['phoneNumber'] as String?)?.isNotEmpty == true)
-          Center(child: Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: Text(data['phoneNumber'] as String, textDirection: TextDirection.ltr,
-                style: const TextStyle(color: Colors.white54)),
-          )),
         const SizedBox(height: 28),
         if (isOwn) ...[
           TextField(controller: name, decoration: const InputDecoration(labelText: 'الاسم')),
@@ -690,8 +694,47 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 }
 
 // محادثة دعم فني محفوظة في Firestore، ويمكن لفريق الدعم الرد عليها من لوحة الإدارة.
+
+class SupportInboxScreen extends StatelessWidget {
+  const SupportInboxScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('صندوق الدعم الفني')),
+    body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance.collection('supportTickets')
+          .orderBy('updatedAt', descending: true).snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) return const Center(child: Text('تعذر تحميل الطلبات. تأكد من صلاحيات حساب الإدارة.'));
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+        final docs = snapshot.data!.docs;
+        if (docs.isEmpty) return const Center(child: Text('لا توجد طلبات دعم حالياً.'));
+        return ListView.separated(
+          itemCount: docs.length,
+          separatorBuilder: (_, __) => const Divider(height: 1),
+          itemBuilder: (context, index) {
+            final item = docs[index];
+            return ListTile(
+              leading: const CircleAvatar(
+                backgroundColor: Color(0xFFFFD54F),
+                child: Icon(Icons.support_agent, color: Colors.black),
+              ),
+              title: Text('مستخدم: ${item.id}'),
+              subtitle: Text((item.data()['status'] as String?) ?? 'مفتوح'),
+              trailing: const Icon(Icons.chevron_left),
+              onTap: () => Navigator.push(context, MaterialPageRoute(
+                builder: (_) => SupportChatScreen(ticketUserId: item.id))),
+            );
+          },
+        );
+      },
+    ),
+  );
+}
+
 class SupportChatScreen extends StatefulWidget {
-  const SupportChatScreen({super.key});
+  final String? ticketUserId;
+  const SupportChatScreen({super.key, this.ticketUserId});
   @override
   State<SupportChatScreen> createState() => _SupportChatScreenState();
 }
@@ -699,7 +742,9 @@ class SupportChatScreen extends StatefulWidget {
 class _SupportChatScreenState extends State<SupportChatScreen> {
   final input = TextEditingController();
   bool sending = false;
-  String get uid => FirebaseAuth.instance.currentUser!.uid;
+  String get uid => widget.ticketUserId ?? FirebaseAuth.instance.currentUser!.uid;
+  String get currentUid => FirebaseAuth.instance.currentUser!.uid;
+  bool get adminMode => widget.ticketUserId != null;
   CollectionReference<Map<String, dynamic>> get messages =>
       FirebaseFirestore.instance.collection('supportTickets').doc(uid).collection('messages');
 
@@ -711,11 +756,11 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
       final ticket = FirebaseFirestore.instance.collection('supportTickets').doc(uid);
       await ticket.set({
         'userId': uid,
-        'status': 'open',
+        if (!adminMode) 'status': 'open',
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
       await messages.add({
-        'senderId': uid,
+        'senderId': currentUid,
         'text': value,
         'createdAt': FieldValue.serverTimestamp(),
       });
@@ -733,7 +778,7 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('الدعم الفني')),
+    appBar: AppBar(title: Text(adminMode ? 'محادثة دعم • $uid' : 'الدعم الفني')),
     body: Column(children: [
       Container(
         width: double.infinity, padding: const EdgeInsets.all(14), color: panelColor,
@@ -751,7 +796,7 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
             padding: const EdgeInsets.all(14), itemCount: docs.length,
             itemBuilder: (context, index) {
               final item = docs[index].data();
-              final mine = item['senderId'] == uid;
+              final mine = item['senderId'] == currentUid;
               return Align(
                 alignment: mine ? AlignmentDirectional.centerStart : AlignmentDirectional.centerEnd,
                 child: Container(
