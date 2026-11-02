@@ -48,40 +48,21 @@ jobs:
       - name: Generate Android platform files
         run: |
           flutter create --platforms=android --org com.chats.mobile .
-          mkdir -p android/app
-          cp firebase/google-services.json android/app/google-services.json
           python3 - <<'PY'
           import os
           from pathlib import Path
 
-          settings = next((p for p in (Path("android/settings.gradle.kts"), Path("android/settings.gradle")) if p.exists()), None)
           app = next((p for p in (Path("android/app/build.gradle.kts"), Path("android/app/build.gradle")) if p.exists()), None)
-          if settings is None or app is None:
-              raise SystemExit("Android Gradle files were not generated")
+          if app is None:
+              raise SystemExit("Android app Gradle file was not generated")
 
-          settings_lines = settings.read_text().splitlines()
-          if not any("com.google.gms.google-services" in line for line in settings_lines):
-              index = next((i for i, line in enumerate(settings_lines) if "org.jetbrains.kotlin.android" in line), None)
-              if index is None:
-                  raise SystemExit("Could not find Kotlin plugin in Gradle settings")
-              plugin = '    id("com.google.gms.google-services") version "4.4.2" apply false' if settings.suffix == ".kts" else '    id "com.google.gms.google-services" version "4.4.2" apply false'
-              settings_lines.insert(index + 1, plugin)
-              settings.write_text("\n".join(settings_lines) + "\n")
-
-          app_lines = app.read_text().splitlines()
-          if not any("com.google.gms.google-services" in line for line in app_lines):
-              index = next((i for i, line in enumerate(app_lines) if "com.android.application" in line), None)
-              if index is None:
-                  raise SystemExit("Could not find Android application plugin")
-              plugin = '    id("com.google.gms.google-services")' if app.suffix == ".kts" else '    id "com.google.gms.google-services"'
-              app_lines.insert(index + 1, plugin)
-
-          index = next((i for i, line in enumerate(app_lines) if "applicationId" in line and not line.strip().startswith("//")), None)
+          lines = app.read_text().splitlines()
+          index = next((i for i, line in enumerate(lines) if "applicationId" in line and not line.strip().startswith("//")), None)
           if index is None:
               raise SystemExit("Could not find Android applicationId")
-          indent = app_lines[index][:len(app_lines[index]) - len(app_lines[index].lstrip())]
-          app_lines[index] = indent + (f'applicationId = "{os.environ["APP_ID"]}"' if app.suffix == ".kts" else f'applicationId "{os.environ["APP_ID"]}"')
-          app.write_text("\n".join(app_lines) + "\n")
+          indent = lines[index][:len(lines[index]) - len(lines[index].lstrip())]
+          lines[index] = indent + (f'applicationId = "{os.environ["APP_ID"]}"' if app.suffix == ".kts" else f'applicationId "{os.environ["APP_ID"]}"')
+          app.write_text("\\n".join(lines) + "\\n")
 
           manifest = Path("android/app/src/main/AndroidManifest.xml")
           if not manifest.exists():
