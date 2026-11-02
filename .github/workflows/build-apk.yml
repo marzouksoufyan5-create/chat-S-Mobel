@@ -62,7 +62,7 @@ jobs:
               raise SystemExit("Could not find Android applicationId")
           indent = lines[index][:len(lines[index]) - len(lines[index].lstrip())]
           lines[index] = indent + (f'applicationId = "{os.environ["APP_ID"]}"' if app.suffix == ".kts" else f'applicationId "{os.environ["APP_ID"]}"')
-          app.write_text("\\n".join(lines) + "\\n")
+          app.write_text(chr(10).join(lines) + chr(10))
 
           manifest = Path("android/app/src/main/AndroidManifest.xml")
           if not manifest.exists():
